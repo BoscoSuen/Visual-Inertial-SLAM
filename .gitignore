@@ -5,3 +5,5 @@
 resource/
 __pycache__/
 *.ipynb
+.vscode/
+.pytest_cache/
