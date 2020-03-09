@@ -50,7 +50,6 @@ for idx in range(len(t[0]) - 1):
     # from piazza: you should implement the covariance propagation in part(a)
     mu,sigma = predict(mu,sigma,delta_t,cur_linear_velocity,cur_rotation_velocity,W,N)
     joint_sigma[3*N:3*N+6,3*N:3*N+6] = sigma
-
     # (b) Landmark Mapping via EKF Update
     # w_T_imu[:,:,idx] = np.linalg.inv(mu)	# Ut is the inverse IMU pose
     # cur_z = features[:,:,idx]
@@ -61,7 +60,7 @@ for idx in range(len(t[0]) - 1):
             continue
         else:
             valid_idx.append(j)
-
+    print(len(valid_idx))
     if (len(valid_idx) > 0):
         z = np.empty(shape=[4,0])
         z_curve_hat = np.empty(shape=[4,0])
@@ -69,11 +68,11 @@ for idx in range(len(t[0]) - 1):
         I_V = np.zeros([len(valid_idx)*4,len(valid_idx)*4])
         for i in range(len(valid_idx)):
             print("update length idx: " + str(i))
-            if (landmark_flag[i] is True):
+            if (landmark_flag[valid_idx[i]] is True):
                 q = np.dot(cam_T_imu,np.dot(mu,joint_mu[:,valid_idx[i]]))
                 dq = dpi_dq(q)
                 z_curve_hat = np.append(z_curve_hat,np.dot(M,get_pi(q)),axis=1)
-                z = np.append(z,features[:,valid_idx[i],idx])		# idx is the time stamp index
+                z = np.append(z,features[:,valid_idx[i],idx],axis=1)		# idx is the time stamp index
                 # TODO: need update the z with z_curve_hat?
                 H[4*i:4*i+4,3*N:3*N+6] = np.dot(M,np.dot(dq,np.dot(cam_T_imu,circle_dot(np.dot(mu,joint_mu[:,valid_idx[i]])))))
                 H[4*i:4*i+4,3*valid_idx[i]:3*valid_idx[i]+3] = np.dot(M,np.dot(dq,np.dot(np.dot(cam_T_imu,mu),D)))
@@ -102,6 +101,5 @@ for idx in range(len(t[0]) - 1):
                 if((joint_mu[:, i]-w_T_imu[:,3,i]).T.dot(joint_mu[:, i]-w_T_imu[:,3,i]))>200000:
                     joint_mu[:, i]= np.array([0,0,0,1]).T
                     landmark_flag[i] = False
-
-visualize_trajectory_2d(w_T_imu,path_name="Path",show_ori=True)
-# visualize_trajectory_2d(w_T_imu,joint_mu,path_name="Path",show_ori=True)
+print(joint_mu)
+visualize_trajectory_2d(w_T_imu,joint_mu[0,:],joint_mu[1,:],path_name="Path",show_ori=True)
