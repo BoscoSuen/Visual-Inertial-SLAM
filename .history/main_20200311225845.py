@@ -64,9 +64,6 @@ for idx in range(len(t[0]) - 1):
                 dq = dpi_dq(q)
                 z_curve_hat[:,i] = M @ get_pi(q)
                 z[:,i] = features[:,valid_idx[i],idx]		# idx is the time stamp index
-                # TODO: need update the z with z_curve_hat?
-                if ((z_curve_hat[:, i] - z[:, i]).T.dot(z_curve_hat[:, i] - z[:, i])) > 100000:
-                    z[:, i] = z_curve_hat[:, i]
                 H[4*i:4*i+4,3*N:3*N+6] = M @ dq @ cam_T_imu @ circle_dot(mu @ joint_mu[:,valid_idx[i]])
                 H[4*i:4*i+4,3*valid_idx[i]:3*valid_idx[i]+3] = M @ dq @ (cam_T_imu @ mu) @ D
                 I_V[4*i:4*i+4,4*i:4*i+4] = V

@@ -2,7 +2,7 @@ import numpy as np
 from converting import up_hat
 from scipy.linalg import expm
 
-def predict(mu,sigma,delta_t,cur_linear_velocity,cur_rotation_velocity,W,N):
+def predict(mu,joint_sigma,delta_t,cur_linear_velocity,cur_rotation_velocity,W,N):
 	ut_up_hat = np.zeros([4, 4])  # pose kinematics
 	ut_up_hat[0:3, 0:3] = up_hat(cur_rotation_velocity)
 	ut_up_hat[0:3, 3] = cur_linear_velocity
@@ -12,7 +12,6 @@ def predict(mu,sigma,delta_t,cur_linear_velocity,cur_rotation_velocity,W,N):
 	ut_curly_up_hat[0:3, 0:3] = up_hat(cur_rotation_velocity)
 	ut_curly_up_hat[3:6, 3:6] = up_hat(cur_rotation_velocity)
 	ut_curly_up_hat[0:3, 3:6] = up_hat(cur_linear_velocity)
-	temp = np.dot(sigma, np.transpose(expm(-delta_t * ut_curly_up_hat)))
-	sigma = np.dot(expm(-delta_t * ut_curly_up_hat), temp) + delta_t ** 2 *W
+	joint_sigma[3*N:3*N+6,3*N:3*N+6] = expm(-delta_t*ut_curly_up_hat).dot(joint_sigma[3*N:3*N+6,3*N:3*N+6].dot(expm(-delta_t*ut_curly_up_hat).T)) + delta_t**2 * W
 
-	return mu,sigma
+	return mu,joint_sigma
