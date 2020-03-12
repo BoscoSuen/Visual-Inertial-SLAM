@@ -8,17 +8,18 @@ from scipy.linalg import expm
 from converting import up_hat,dpi_dq,get_pi,get_calibration_matrix,circle_dot,up_hat_pose
 
 # if __name__ == '__main__':
-filename = "./data/0027.npz"
+filename = "./data/0020.npz"
 t,features,linear_velocity,rotational_velocity,K,b,cam_T_imu = load_data(filename)
 
 N = features.shape[1]
 mu = np.eye(4)
-sigma = 0.05*np.eye(6)
+sigma = np.zeros([6,6])
 
 joint_mu = np.zeros([4,N])	# vectorize the update
 joint_sigma = 0.05*np.eye(3*N+6)
+joint_sigma[3*N:3*N+6,3*N:3*N+6] = sigma
 
-print(joint_sigma.shape)
+# print(joint_sigma.shape)
 w_T_imu = np.zeros([4,4,len(t[0])-1])
 D = np.zeros([4,3])
 D[0:3,0:3] = np.eye(3)
@@ -59,25 +60,24 @@ for idx in range(len(t[0]) - 1):
         H = np.zeros([len(valid_idx)*4,3*N+6])
         I_V = np.zeros([len(valid_idx)*4,len(valid_idx)*4])
         for i in range(len(valid_idx)):
-            if (landmark_flag[valid_idx[i]] == True):
-                q = cam_T_imu @ (mu @ joint_mu[:,valid_idx[i]])
-                dq = dpi_dq(q)
-                z_curve_hat[:,i] = M @ get_pi(q)
-                z[:,i] = features[:,valid_idx[i],idx]		# idx is the time stamp index
-                # TODO: need update the z with z_curve_hat?
-                if ((z_curve_hat[:, i] - z[:, i]).T.dot(z_curve_hat[:, i] - z[:, i])) > 100000:
-                    z[:, i] = z_curve_hat[:, i]
-                H[4*i:4*i+4,3*N:3*N+6] = M @ dq @ cam_T_imu @ circle_dot(mu @ joint_mu[:,valid_idx[i]])
-                H[4*i:4*i+4,3*valid_idx[i]:3*valid_idx[i]+3] = M @ dq @ (cam_T_imu @ mu) @ D
-                I_V[4*i:4*i+4,4*i:4*i+4] = V
+            q = cam_T_imu @ (mu @ joint_mu[:,valid_idx[i]])
+            dq = dpi_dq(q)
+            z_curve_hat[:,i] = M @ get_pi(q)
+            z[:,i] = features[:,valid_idx[i],idx]		# idx is the time stamp index
+            # avoid sigular matrix
+            if ((z_curve_hat[:, i] - z[:, i]).T.dot(z_curve_hat[:, i] - z[:, i])) > 100000:
+                z[:, i] = z_curve_hat[:, i]
+            H[4*i:4*i+4,3*N:3*N+6] = M @ dq @ cam_T_imu @ circle_dot(mu @ joint_mu[:,valid_idx[i]])
+            H[4*i:4*i+4,3*valid_idx[i]:3*valid_idx[i]+3] = M @ dq @ (cam_T_imu @ mu) @ D
+            I_V[4*i:4*i+4,4*i:4*i+4] = V
 
         # Perform the EKF update
         # update K(t+1|t)
-        K = joint_sigma @ np.transpose(H) @ (np.linalg.inv(H @ (joint_sigma @ np.transpose(H))+I_V))
+        K_t = joint_sigma @ np.transpose(H) @ (np.linalg.inv((H @ (joint_sigma @ np.transpose(H)))+I_V))
         # update u(t+1|t)
-        mu = expm(up_hat_pose(K[3*N:3*N+6,:] @ ((z-z_curve_hat).reshape(-1,1,order='F')))) @ mu
-        joint_mu = joint_mu + D @ ((K[0:3*N,:] @ ((z-z_curve_hat).reshape(-1,1,order='F'))).reshape(3,-1,order='F'))
-        joint_sigma = joint_sigma - (K @ H @ joint_sigma)
+        mu = expm(up_hat_pose(K_t[3*N:3*N+6,:] @ ((z-z_curve_hat).reshape(-1,1,order='F')))) @ mu
+        joint_mu = joint_mu + D @ ((K_t[0:3*N,:] @ ((z-z_curve_hat).reshape(-1,1,order='F'))).reshape(3,-1,order='F'))
+        joint_sigma = joint_sigma - (K_t @ H @ joint_sigma)
 
     w_T_imu[:,:,idx] = np.linalg.inv(mu)	# Ut is the inverse IMU pose
 
@@ -93,5 +93,5 @@ for idx in range(len(t[0]) - 1):
                 if((joint_mu[:, i]-w_T_imu[:,3,idx]).T.dot(joint_mu[:, i]-w_T_imu[:,3,idx]))>200000:
                     joint_mu[:, i]= np.array([0,0,0,1]).T
                     landmark_flag[i] = False
-print(joint_mu)
+                    
 visualize_trajectory_2d(w_T_imu,joint_mu[0,:],joint_mu[1,:],path_name="Path",show_ori=True)

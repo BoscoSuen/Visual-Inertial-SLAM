@@ -27,7 +27,7 @@ def dpi_dq(q):         # the dpi/dq calculation
     dpi_dq[1,2] = -q[1]/q[2]
     dpi_dq[2,2] = 0
     dpi_dq[3,2] = -q[3]/q[2]
-    return dpi_dq
+    return dpi_dq/q[2]
 
 def circle_dot(q):
     c_d = np.zeros([4,6])

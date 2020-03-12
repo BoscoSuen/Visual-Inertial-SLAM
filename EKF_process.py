@@ -6,12 +6,12 @@ def predict(mu,joint_sigma,delta_t,cur_linear_velocity,cur_rotation_velocity,W,N
 	ut_up_hat = np.zeros([4, 4])  # pose kinematics
 	ut_up_hat[0:3, 0:3] = up_hat(cur_rotation_velocity)
 	ut_up_hat[0:3, 3] = cur_linear_velocity
-	mu = expm(-delta_t * ut_up_hat).dot(mu)
+	mu = expm(-delta_t * ut_up_hat) @ mu
 
 	ut_curly_up_hat = np.zeros([6, 6])
 	ut_curly_up_hat[0:3, 0:3] = up_hat(cur_rotation_velocity)
 	ut_curly_up_hat[3:6, 3:6] = up_hat(cur_rotation_velocity)
 	ut_curly_up_hat[0:3, 3:6] = up_hat(cur_linear_velocity)
-	joint_sigma[3*N:3*N+6,3*N:3*N+6] = expm(-delta_t*ut_curly_up_hat).dot(joint_sigma[3*N:3*N+6,3*N:3*N+6].dot(expm(-delta_t*ut_curly_up_hat).T)) + delta_t**2 * W
+	joint_sigma[3*N:3*N+6,3*N:3*N+6] = expm(-delta_t*ut_curly_up_hat) @ (joint_sigma[3*N:3*N+6,3*N:3*N+6] @ (expm(-delta_t*ut_curly_up_hat).T)) + delta_t**2 * W
 
 	return mu,joint_sigma
