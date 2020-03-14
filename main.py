@@ -1,5 +1,6 @@
 import numpy as np
 import cv2,os
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from transforms3d.euler import mat2euler
 from utils import *
@@ -15,7 +16,7 @@ N = features.shape[1]
 mu = np.eye(4)
 sigma = np.zeros([6,6])
 
-joint_mu = np.zeros([4,N])	# vectorize the update
+land_mark = np.zeros([4,N])	# landmark
 joint_sigma = 0.05*np.eye(3*N+6)
 joint_sigma[3*N:3*N+6,3*N:3*N+6] = sigma
 
@@ -32,9 +33,9 @@ delta_t_list = []	# delta_t is different
 for i in range(len(t[0])-1):
     delta_t_list.append(t[0][i+1] - t[0][i])
 
-for idx in range(len(t[0]) - 1):
+for idx in tqdm(range(len(t[0]) - 1)):
     # (a) IMU Loctransforms3d.euleralization via EKF Prediction
-    print("time stamp idx: " + str(idx))
+    # print("time stamp idx: " + str(idx))
     # print(sum(landmark_flag))
     V_factor = 8000
     W_factor = 0.05
@@ -62,14 +63,14 @@ for idx in range(len(t[0]) - 1):
         I_V = np.zeros([len(valid_idx)*4,len(valid_idx)*4])
 
         # Perform the EKF update
-        z,z_curve_hat,H,I_V = update(z,z_curve_hat,H,I_V,cam_T_imu,joint_mu,M,features,mu,valid_idx,D,V,N,idx)
+        z,z_curve_hat,H,I_V = update(z,z_curve_hat,H,I_V,cam_T_imu,land_mark,M,features,mu,valid_idx,D,V,N,idx)
 
         # update K(t+1|t)
         K_t = joint_sigma @ np.transpose(H) @ (np.linalg.inv((H @ (joint_sigma @ np.transpose(H)))+I_V))
         # update u(t+1|t)
         mu = expm(up_hat_pose(K_t[3*N:3*N+6,:] @ ((z-z_curve_hat).reshape(-1,1,order='F')))) @ mu
-        joint_mu = joint_mu + D @ ((K_t[0:3*N,:] @ ((z-z_curve_hat).reshape(-1,1,order='F'))).reshape(3,-1,order='F'))
-        joint_sigma = joint_sigma - (K_t @ H @ joint_sigma)
+        land_mark = land_mark + D @ ((K_t[0:3*N,:] @ ((z-z_curve_hat).reshape(-1,1,order='F'))).reshape(3,-1,order='F'))
+        joint_sigma = (np.eye(K_t.shape[0]) - K_t @ H) @ joint_sigma
 
     w_T_imu_update[:,:,idx] = np.linalg.inv(mu)	# Ut is the inverse IMU pose
 
@@ -80,14 +81,15 @@ for idx in range(len(t[0]) - 1):
                 z = K[0, 0] * b / d
                 optical_bp = np.array([(features[0, i, idx] - K[0, 2]) * z / K[0, 0], (features[1, i, idx] - K[1, 2]) * z / K[1, 1], z, 1])
 
-                joint_mu[:, i] = np.linalg.inv(mu) @ (np.linalg.inv(cam_T_imu)) @ (np.transpose(optical_bp))
+                land_mark[:, i] = np.linalg.inv(mu) @ (np.linalg.inv(cam_T_imu)) @ (np.transpose(optical_bp))
                 landmark_flag[i] = True
                 # avoid singular matrix
-                if((joint_mu[:, i]-w_T_imu_update[:,3,idx]).T.dot(joint_mu[:, i]-w_T_imu_update[:,3,idx]))>10000:
-                    joint_mu[:, i]= np.array([0,0,0,1]).T
-                    landmark_flag[i] = False
-
+                # if((land_mark[:, i]-w_T_imu_update[:,3,idx]).T.dot(land_mark[:, i]-w_T_imu_update[:,3,idx]))>10000:
+                #     land_mark[:, i]= np.array([0,0,0,1]).T
+                #     landmark_flag[i] = False
 
 # (c) Visual-Inertial SLAM
-visualize_trajectory_2d(w_T_imu_pred,joint_mu[0,:],joint_mu[1,:],path_name="Path",show_ori=True)
-visualize_trajectory_2d(w_T_imu_update,joint_mu[0,:],joint_mu[1,:],path_name="Path",show_ori=True)
+visualize_trajectory_2d_pose(w_T_imu_pred,path_name="Path",show_ori=True,path_save="output/pose_pred.png")
+visualize_trajectory_2d_pose(w_T_imu_update,path_name="Path",show_ori=True,path_save="output/pose_update.png")
+visualize_trajectory_2d(w_T_imu_pred,land_mark[0,:],land_mark[1,:],path_name="Path",show_ori=True,path_save="output/landmark_pred.png")
+visualize_trajectory_2d(w_T_imu_update,land_mark[0,:],land_mark[1,:],path_name="Path",show_ori=True,path_save="output/landmark_upate.png")
