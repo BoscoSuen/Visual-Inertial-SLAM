@@ -7,7 +7,7 @@ def get_calibration_matrix(K,b):
     M[2,3] = -K[0,0]*b
     return M
 
-def up_hat(p):          # the ^ calculation
+def up_hat(p):          # the hat map calculation
     P = np.zeros([3,3])
     P[0,1] = -p[2]
     P[0,2] = p[1]

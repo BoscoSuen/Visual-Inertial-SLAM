@@ -8,3 +8,5 @@ __pycache__/
 .vscode/
 .pytest_cache/
 .history
+output/
+tempCodeRunnerFile.py
